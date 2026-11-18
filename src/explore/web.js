@@ -125,7 +125,9 @@ async function check(page, action, loc) {
  * action `status` + `note`. Plans are explored in fresh browser contexts.
  */
 export async function exploreWeb(plans, { baseUrl, framework = 'playwright', chooser = null, headless = true, urlGuard = null, onProgress = () => {} } = {}) {
-  const browser = await chromium.launch({ headless });
+  // CHROME_ARGS (set in the Dockerfile) keeps Chromium within a small container's memory.
+  const args = (process.env.CHROME_ARGS || '').split(/\s+/).filter(Boolean);
+  const browser = await chromium.launch({ headless, args });
   try {
     for (const plan of plans) {
       const context = await browser.newContext({ baseURL: baseUrl });

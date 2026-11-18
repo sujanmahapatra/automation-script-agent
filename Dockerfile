@@ -9,7 +9,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=10000 \
     SE_CACHE_PATH=/app/.selenium \
-    CHROME_ARGS="--no-sandbox --disable-dev-shm-usage"
+    CHROME_ARGS="--no-sandbox --disable-dev-shm-usage --disable-gpu --renderer-process-limit=2"
 
 COPY package.json package-lock.json ./
 # Dev dependencies too: selenium-webdriver and tsx run the "Run the generated tests" option.

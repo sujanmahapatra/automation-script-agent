@@ -73,7 +73,8 @@ export async function verifyProject(files, { framework, language, baseUrl }) {
       if (!tests.length) return { ran: false, reason: (r.stderr || r.stdout).split('\n').slice(0, 8).join('\n') };
     } else {
       const cli = join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js');
-      const r = await run(process.execPath, [cli, 'test', '--config', join(dir, 'playwright.config.ts'), '--reporter=json'], { cwd: dir, env });
+      // One worker: a small hosted instance holds one browser, not one per CPU.
+      const r = await run(process.execPath, [cli, 'test', '--config', join(dir, 'playwright.config.ts'), '--reporter=json', '--workers=1'], { cwd: dir, env });
       try {
         tests = playwrightResults(JSON.parse(r.stdout));
       } catch {
