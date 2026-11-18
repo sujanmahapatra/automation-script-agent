@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Low-Code Recorder</title>
+<style>
+  :root { --bg:#f5f5f3; --panel:#fff; --fg:#1b1b19; --muted:#6b6a65; --line:#e2e1dc; --soft:#f0efea; --accent:#2b59c3; --accent-fg:#fff;
+          --ok:#1d7a4c; --ok-bg:#e7f4ec; --warn:#a15c07; --warn-bg:#fdf3e1; --bad:#b4271f; --bad-bg:#fbeceb; --info-bg:#e9effb; --rec:#d93025; --ai:#7a4bd6; --ai-bg:#f1ebfc; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#121211; --panel:#1b1b1a; --fg:#ecebe6; --muted:#9d9c96; --line:#2e2e2b; --soft:#242422;
+          --accent:#86a2f2; --accent-fg:#111; --ok:#5ec392; --ok-bg:#15291e; --warn:#e7b24d; --warn-bg:#2b2312; --bad:#f08178; --bad-bg:#2e1715; --info-bg:#1a2238; --rec:#ff6b5e; --ai:#b79af5; --ai-bg:#251d36; } }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .mono, pre, code { font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; font-size:12.5px; }
+  [hidden] { display:none !important; }
+  .btn { border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:6px 12px; text-decoration:none; color:inherit; }
+  .btn:hover { border-color:var(--muted); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600; }
+  .btn.ai { background:var(--ai); border-color:var(--ai); color:#fff; font-weight:600; }
+  .btn[disabled] { opacity:.55; cursor:progress; }
+  .link { border:0; background:none; padding:0; color:var(--accent); font-size:13px; }
+  .link.ai { color:var(--ai); }
+  .muted { color:var(--muted); }
+  .icon { width:16px; height:16px; flex:none; }
+
+  /* start */
+  .start { min-height:100%; display:grid; place-items:center; padding:24px 16px; }
+  .start .card { width:min(560px, 100%); background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px; display:flex; flex-direction:column; gap:14px; }
+  .start h1 { margin:0; font-size:20px; }
+  .start p { margin:0; color:var(--muted); }
+  .start form { display:flex; gap:8px; }
+  .start input { flex:1; min-width:0; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--panel); }
+  .start ul { margin:0; padding-left:18px; color:var(--muted); }
+  .start .row { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+
+  /* recording */
+  .app { height:100%; display:grid; grid-template-columns:minmax(0, 1fr) 400px; }
+  .browser { display:flex; flex-direction:column; min-width:0; min-height:0; padding:12px; gap:8px; }
+  .bar { display:flex; gap:6px; align-items:center; }
+  .bar .url { flex:1; min-width:0; border:1px solid var(--line); border-radius:999px; padding:6px 14px; background:var(--panel); }
+  .bar .nav { border:1px solid var(--line); background:var(--panel); border-radius:999px; width:34px; height:34px; display:grid; place-items:center; }
+  .spinner { width:16px; height:16px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--accent); animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .viewer-wrap { flex:1; min-height:0; display:flex; align-items:flex-start; justify-content:center; overflow:auto; }
+  .viewer { position:relative; width:100%; max-width:1280px; aspect-ratio:1280 / 800; background:var(--soft); border:1px solid var(--line); border-radius:10px; overflow:hidden; outline:none; cursor:default; }
+  .viewer:focus { border-color:var(--accent); }
+  .viewer img { width:100%; height:100%; display:block; user-select:none; -webkit-user-drag:none; }
+  .viewer.validate { cursor:crosshair; box-shadow:0 0 0 3px var(--ok); }
+  .banner { position:absolute; left:50%; top:10px; transform:translateX(-50%); background:var(--ok); color:#fff; border-radius:999px; padding:5px 14px; font-size:13px; font-weight:600; display:flex; gap:10px; align-items:center; pointer-events:auto; }
+  .banner button { border:0; background:rgba(255,255,255,.25); color:#fff; border-radius:999px; padding:1px 10px; }
+  .hint { position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,.6); color:#fff; border-radius:8px; padding:4px 10px; font-size:12px; pointer-events:none; }
+  .popover { position:absolute; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); min-width:200px; max-height:260px; overflow:auto; padding:4px; z-index:3; }
+  .popover .title { padding:6px 10px; font-size:12px; color:var(--muted); }
+  .popover button { display:block; width:100%; text-align:left; border:0; background:none; padding:7px 10px; border-radius:6px; }
+  .popover button:hover, .popover button[aria-selected="true"] { background:var(--info-bg); }
+
+  /* steps panel */
+  .panel { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  .tools { display:flex; gap:6px; padding:12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .tool { display:flex; gap:6px; align-items:center; border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:6px 10px; font-size:13px; }
+  .tool[aria-pressed="true"] { border-color:var(--ok); background:var(--ok-bg); color:var(--ok); font-weight:600; }
+  .tool.ai[aria-pressed="true"] { border-color:var(--ai); background:var(--ai-bg); color:var(--ai); }
+  .head { display:flex; align-items:center; gap:8px; padding:12px 14px 6px; }
+  .head h2 { margin:0; font-size:14px; }
+  .rec { display:flex; gap:5px; align-items:center; background:var(--bad-bg); color:var(--rec); border-radius:999px; padding:1px 8px; font-size:11px; font-weight:700; }
+  .rec::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--rec); animation:blink 1.4s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  .head .spacer { flex:1; }
+  .scroll { flex:1; overflow:auto; padding:4px 10px 12px; }
+  ol.steps { list-style:none; margin:0; padding:0; }
+  .step { display:grid; grid-template-columns:14px 20px 24px minmax(0, 1fr) auto; gap:6px; align-items:start; padding:8px 4px; border-radius:8px; }
+  .step:hover { background:var(--soft); }
+  .step.selected { background:var(--info-bg); }
+  .step .grip { color:var(--muted); cursor:grab; opacity:0; font-size:12px; line-height:22px; user-select:none; }
+  .step:hover .grip { opacity:1; }
+  .step .num { color:var(--muted); font-size:12px; line-height:22px; text-align:right; }
+  .step .ico { width:22px; height:22px; border:1px solid var(--line); border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:700; color:var(--muted); background:var(--panel); }
+  .step .ico.ai { border-color:var(--ai); color:var(--ai); }
+  .step .text { overflow-wrap:anywhere; cursor:pointer; }
+  .step.selected .text { color:var(--accent); text-decoration:underline; }
+  .step .sub { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+  .step .err { color:var(--bad); font-size:12px; overflow-wrap:anywhere; }
+  .badge { font-size:11px; border-radius:999px; padding:1px 7px; font-weight:600; white-space:nowrap; }
+  .badge.passed { background:var(--ok-bg); color:var(--ok); }
+  .badge.failed { background:var(--bad-bg); color:var(--bad); }
+  .badge.skipped { background:var(--soft); color:var(--muted); }
+  .badge.running { background:var(--info-bg); color:var(--accent); }
+  .step-actions { grid-column:4 / 6; display:flex; gap:14px; flex-wrap:wrap; padding-top:4px; }
+  .step-actions .link.bad { color:var(--bad); }
+  .step.drop-before { box-shadow:inset 0 2px 0 var(--accent); }
+  .insert { margin:6px 0 4px; }
+  .insert .label { display:flex; gap:6px; align-items:center; color:var(--accent); font-weight:600; font-size:13px; padding:0 4px; }
+  .insert .box { margin:6px 0 0 30px; border:1.5px dashed var(--line); border-radius:8px; padding:9px 12px; color:var(--accent); font-size:13px; background:var(--info-bg); }
+  .insert .links { margin:8px 0 0 30px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .aibox { margin:10px 0 0 30px; border:1px solid var(--ai); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .aibox .title { display:flex; gap:6px; align-items:center; font-weight:600; }
+  .alpha { font-size:10.5px; background:var(--ai-bg); color:var(--ai); border-radius:999px; padding:1px 7px; font-weight:700; }
+  .aibox .radios { display:flex; gap:16px; }
+  .aibox textarea { width:100%; min-height:80px; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--panel); }
+  .aibox .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .foot { display:flex; gap:8px; align-items:center; padding:12px 14px; border-top:1px solid var(--line); }
+  .foot .spacer { flex:1; }
+
+  /* save dialog */
+  dialog { border:1px solid var(--line); border-radius:14px; padding:0; width:min(1100px, calc(100vw - 32px)); max-height:calc(100vh - 32px); background:var(--panel); color:var(--fg); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  .dlg { display:flex; flex-direction:column; max-height:calc(100vh - 34px); }
+  .dlg header { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .dlg header h2 { margin:0; font-size:16px; flex:1; }
+  .dlg .body { padding:16px 18px; overflow:auto; display:flex; flex-direction:column; gap:14px; }
+  .field .label { font-weight:600; margin-bottom:6px; }
+  .field input[type=text] { width:100%; border:1px solid var(--line); border-radius:8px; padding:7px 9px; background:var(--panel); }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg button { border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:6px 12px; }
+  .seg button[aria-pressed="true"] { border-color:var(--accent); background:var(--info-bg); color:var(--accent); font-weight:600; }
+  .files { display:grid; grid-template-columns:240px minmax(0, 1fr); border:1px solid var(--line); border-radius:10px; overflow:hidden; min-height:320px; }
+  .files nav { border-right:1px solid var(--line); overflow:auto; max-height:480px; }
+  .files nav button { display:block; width:100%; text-align:left; border:0; background:none; padding:7px 10px; overflow-wrap:anywhere; }
+  .files nav button[aria-selected="true"] { background:var(--info-bg); color:var(--accent); font-weight:600; }
+  .files pre { margin:0; padding:12px; overflow:auto; max-height:480px; background:var(--soft); }
+  .result { padding:10px 12px; border-radius:10px; }
+  .result.ok { background:var(--ok-bg); color:var(--ok); }
+  .result.bad { background:var(--bad-bg); color:var(--bad); }
+  .result.note { background:var(--soft); color:var(--muted); }
+  .toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--bad); color:#fff; padding:9px 16px; border-radius:10px; max-width:min(640px, calc(100vw - 32px)); z-index:10; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  .toast.info { background:var(--fg); color:var(--bg); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns:1fr; grid-template-rows:auto minmax(320px, 1fr); height:auto; min-height:100%; }
+    .panel { border-left:0; border-top:1px solid var(--line); }
+    .files { grid-template-columns:1fr; }
+    .files nav { max-height:160px; border-right:0; border-bottom:1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<main class="start" id="start">
+  <div class="card">
+    <h1>Low-code recorder</h1>
+    <p>Use your app as normal and every click, typed value and check becomes a test step. Then export it as Playwright, Selenium or Appium code.</p>
+    <form id="start-form">
+      <input id="start-url" type="text" inputmode="url" placeholder="https://your-app.example.com" aria-label="App address" autocomplete="url">
+      <button class="btn primary" id="start-btn">Start recording</button>
+    </form>
+    <div class="row">
+      <button class="link" id="demo-btn" type="button">Use the demo app</button>
+      <a class="link" href="./">Convert manual tests instead</a>
+    </div>
+    <ul>
+      <li><b>Visual validation</b>: click an element to check it is visible.</li>
+      <li><b>Text validation</b>: click an element to check its text or value.</li>
+      <li><b>AI interactions</b>: describe actions or checks in plain words.</li>
+      <li><b>Import a module</b>: reuse a saved recording, such as a sign-in.</li>
+    </ul>
+  </div>
+</main>
+
+<div class="app" id="app" hidden>
+  <section class="browser" aria-label="Browser">
+    <div class="bar">
+      <button class="nav" id="back" title="Back" aria-label="Back"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="nav" id="reload" title="Reload" aria-label="Reload"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
+      <form id="url-form" style="flex:1;display:flex"><input class="url mono" id="url" aria-label="Page address" autocomplete="off"></form>
+      <span class="spinner" id="busy" hidden></span>
+    </div>
+    <div class="viewer-wrap">
+      <div class="viewer" id="viewer" tabindex="0" aria-label="Recorded page: click to interact, then type">
+        <img id="screen" alt="">
+        <div class="banner" id="banner" hidden><span id="banner-text"></span><button type="button" id="banner-cancel">Cancel</button></div>
+        <div class="hint" id="hint">Click to interact · type on your keyboard</div>
+        <div class="popover" id="select-pop" hidden role="listbox"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel" aria-label="Test steps">
+    <div class="tools">
+      <button class="tool" id="tool-visual" aria-pressed="false" title="Click an element to check it is visible">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Visual validation</button>
+      <button class="tool" id="tool-text" aria-pressed="false" title="Click an element to check its text or value">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>Text validation</button>
+      <button class="tool ai" id="tool-ai" aria-pressed="false">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z"/></svg>AI interactions</button>
+    </div>
+    <div class="head">
+      <h2>Test steps</h2><span class="rec">REC</span>
+      <span class="spacer"></span>
+      <button class="link" id="verify-url" title="Add a check on the current URL">Verify URL</button>
+      <button class="link" id="verify-title" title="Add a check on the page title">Verify title</button>
+      <button class="btn" id="run-all" title="Run every step from the start">Run all</button>
+    </div>
+    <div class="scroll" id="steps-scroll">
+      <ol class="steps" id="steps"></ol>
+    </div>
+    <div class="foot">
+      <a class="btn" id="download-rec" href="#" download title="Save the steps to import later as a module">Save as module</a>
+      <span class="spacer"></span>
+      <button class="btn" id="exit">Exit</button>
+      <button class="btn primary" id="save">Save recording</button>
+    </div>
+  </aside>
+</div>
+
+<template id="insert-tpl">
+  <li class="insert" id="insert">
+    <div class="label">» Interact with the browser</div>
+    <div class="box">New step(s) will be added here</div>
+    <div class="links">
+      <button class="link ai" type="button" data-act="open-ai">✦ AI interactions</button>
+      <label class="link" style="cursor:pointer">⇅ Import a module<input type="file" accept=".json,application/json" data-act="import" hidden></label>
+      <button class="link" type="button" data-act="to-end" hidden>Add at the end instead</button>
+    </div>
+    <div class="aibox" data-role="aibox" hidden>
+      <div class="title">✦ AI interactions <span class="alpha">Alpha</span></div>
+      <div class="muted" style="font-size:13px">Select the AI interaction command</div>
+      <div class="radios">
+        <label><input type="radio" name="ai-mode" value="validation"> Validation</label>
+        <label><input type="radio" name="ai-mode" value="action" checked> Action</label>
+      </div>
+      <textarea data-role="instruction" placeholder="e.g. Type delhi in the destination field and click Search"></textarea>
+      <div class="row">
+        <button class="btn ai" type="button" data-act="perform">✦ Perform</button>
+        <span class="muted" style="font-size:12px" data-role="engine"></span>
+      </div>
+    </div>
+  </li>
+</template>
+
+<dialog id="save-dlg">
+  <div class="dlg">
+    <header><h2>Save recording</h2><button class="btn" id="dlg-close" type="button">Back to recording</button></header>
+    <div class="body">
+      <div class="field"><div class="label">Test name</div><input type="text" id="test-name" value="Recorded test"></div>
+      <div class="field"><div class="label">Framework</div><div class="seg" id="fw-seg"></div></div>
+      <div class="field"><div class="label">Language</div><div class="seg" id="lang-seg"></div></div>
+      <label id="verify-wrap"><input type="checkbox" id="verify-run" checked> Run the generated test once to check it passes</label>
+      <div><button class="btn primary" id="generate" type="button">Generate code</button></div>
+      <div id="out" hidden>
+        <div id="out-result"></div>
+        <div style="display:flex;gap:8px;margin:10px 0">
+          <button class="btn primary" id="zip" type="button">Download .zip</button>
+          <a class="btn" id="dlg-download-rec" href="#" download>Save as module (.json)</a>
+        </div>
+        <div class="files"><nav id="file-list" aria-label="Files"></nav><pre id="file-view"></pre></div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" hidden role="status"></div>
+<script type="module" src="record/client.js"></script>
+</body>
+</html>

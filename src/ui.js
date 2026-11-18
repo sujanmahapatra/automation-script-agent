@@ -98,7 +98,7 @@ export function renderPage() {
 </style></head><body>
 <header>
   <h1>Automation Script Agent</h1>
-  <p>Turn manual test cases into Playwright, Selenium, Appium and API automation projects.</p>
+  <p>Turn manual test cases into Playwright, Selenium, Appium and API automation projects. Or <a href="record">record a test in the browser</a> with the low-code recorder.</p>
 </header>
 <div class="layout">
   <form class="card" id="form">

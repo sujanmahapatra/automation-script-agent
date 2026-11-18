@@ -10,6 +10,7 @@ import { convert } from './agent.js';
 import { FRAMEWORKS, LANGUAGE_LABELS, RUNNABLE } from './model.js';
 import { renderPage } from './ui.js';
 import { checkPassword, createUrlGuard } from './guard.js';
+import { createRecordingRoutes } from './record/routes.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_BODY = 30 * 1024 * 1024;
@@ -44,6 +45,7 @@ export async function startServer({
   let demo = null;
   // One conversion at a time: each can hold a browser, and small hosts have little memory.
   let queue = Promise.resolve();
+  const recording = createRecordingRoutes({ publicOnly, readBody, sendJson, demoUrl: () => demo?.url });
   const server = http.createServer(async (req, res) => {
     const path = req.url.split('?')[0];
     if (path === '/healthz') {
@@ -52,6 +54,7 @@ export async function startServer({
     }
     if (!checkPassword(req, res, password)) return;
     try {
+      if (await recording(req, res, path)) return;
       if (req.method === 'GET' && path === '/') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         return res.end(renderPage());
@@ -122,5 +125,5 @@ export async function startServer({
     }
   });
   await new Promise((resolve, reject) => server.once('error', reject).listen(port, host, resolve));
-  return { url: `http://${host}:${server.address().port}/`, close: () => new Promise((r) => { demo?.close(); server.close(r); }) };
+  return { url: `http://${host}:${server.address().port}/`, close: () => new Promise((r) => { demo?.close(); recording.close().finally(() => server.close(r)); }) };
 }

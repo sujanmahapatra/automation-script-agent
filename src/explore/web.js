@@ -25,6 +25,44 @@ export function toPlaywright(page, l) {
   }
 }
 
+/**
+ * The most readable locator that finds only candidate `choice` on the page, or
+ * null. Needs the scan's data-agent-cand markers still in place.
+ */
+export async function uniqueLocator(page, choice, framework) {
+  if (framework === 'selenium') {
+    const options = seleniumOptions(choice);
+    const ok = await page.evaluate(([opts, i]) => {
+      // inline copy of firstUnique: page.evaluate takes one function
+      for (const o of opts) {
+        const found = [];
+        try {
+          if (o.check.using === 'css') found.push(...document.querySelectorAll(o.check.value));
+          else {
+            const r = document.evaluate(o.check.value, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+            for (let k = 0; k < r.snapshotLength; k++) found.push(r.snapshotItem(k));
+          }
+        } catch {
+          continue;
+        }
+        if (found.length === 1 && found[0].getAttribute('data-agent-cand') === String(i)) return o;
+      }
+      return null;
+    }, [options, choice.index]);
+    return ok ? { strategy: ok.strategy, value: ok.value } : null;
+  }
+  for (const option of playwrightOptions(choice)) {
+    try {
+      const loc = toPlaywright(page, option);
+      if ((await loc.count()) !== 1) continue;
+      if ((await loc.getAttribute('data-agent-cand')) === String(choice.index)) return option;
+    } catch {
+      // an option the engine rejects is skipped
+    }
+  }
+  return null;
+}
+
 async function resolve(page, action, framework, chooser) {
   const candidates = await page.evaluate(scanCandidates, {});
   try {
@@ -41,37 +79,8 @@ async function resolve(page, action, framework, chooser) {
       const near = ranked.slice(0, 2).map((r) => `"${r.c.text || r.c.label || r.c.placeholder || r.c.ariaLabel || r.c.tag}"`).join(', ');
       return { locator: null, note: `no element on the page clearly matches "${action.target.description}"${near ? ` (closest: ${near})` : ''}` };
     }
-    if (framework === 'selenium') {
-      const options = seleniumOptions(choice);
-      const ok = await page.evaluate(([opts, i]) => {
-        // inline copy of firstUnique: page.evaluate takes one function
-        for (const o of opts) {
-          const found = [];
-          try {
-            if (o.check.using === 'css') found.push(...document.querySelectorAll(o.check.value));
-            else {
-              const r = document.evaluate(o.check.value, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-              for (let k = 0; k < r.snapshotLength; k++) found.push(r.snapshotItem(k));
-            }
-          } catch {
-            continue;
-          }
-          if (found.length === 1 && found[0].getAttribute('data-agent-cand') === String(i)) return o;
-        }
-        return null;
-      }, [options, choice.index]);
-      return ok ? { locator: { strategy: ok.strategy, value: ok.value }, note: how } : { locator: null, note: 'element found, but no unique locator could be built' };
-    }
-    for (const option of playwrightOptions(choice)) {
-      try {
-        const loc = toPlaywright(page, option);
-        if ((await loc.count()) !== 1) continue;
-        if ((await loc.getAttribute('data-agent-cand')) === String(choice.index)) return { locator: option, note: how };
-      } catch {
-        // an option the engine rejects is skipped
-      }
-    }
-    return { locator: null, note: 'element found, but no unique locator could be built' };
+    const locator = await uniqueLocator(page, choice, framework);
+    return locator ? { locator, note: how } : { locator: null, note: 'element found, but no unique locator could be built' };
   } finally {
     await page.evaluate(clearMarkers).catch(() => {});
   }
@@ -79,7 +88,7 @@ async function resolve(page, action, framework, chooser) {
 
 const absolute = (url, baseUrl) => new URL(url || '/', baseUrl).href;
 
-async function perform(page, action, loc) {
+export async function perform(page, action, loc) {
   switch (action.type) {
     case 'goto': return page.goto(absolute(action.url, action.baseUrl), { waitUntil: 'load', timeout: 15000 });
     case 'click': {
@@ -98,7 +107,7 @@ async function perform(page, action, loc) {
 }
 
 /** True when the assertion holds on the live page. */
-async function check(page, action, loc) {
+export async function check(page, action, loc) {
   const wait = async (fn) => {
     const end = Date.now() + STEP_TIMEOUT;
     while (Date.now() < end) {

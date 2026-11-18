@@ -33,6 +33,42 @@ app's URL, or click **Use the demo app**, then click **Generate**. You get:
 - **Run**: the generated tests' results.
 - **Download .zip**: the whole project.
 
+### Low-code recorder
+
+Open **/record** (http://127.0.0.1:9330/record), or follow the link at the top
+of the main page, to record a test without writing it first:
+
+1. Enter the app's address (or click **Use the demo app**) and click
+   **Start recording**. A browser on the server opens the app and streams it
+   to the page.
+2. Use the app as normal: click, type, choose from dropdowns, tick boxes.
+   Each action is done on the real page and listed as a step, such as
+   *Click on "Search" button* or *Type "delhi" in "Destination" text input*.
+   Password values are shown as ••••••.
+3. Add checks:
+   - **Visual validation**, then click an element: it must be visible.
+   - **Text validation**, then click an element: it must show its text (or
+     hold its value).
+   - **Verify URL** and **Verify title** check the current page.
+4. **AI interactions**: choose **Action** or **Validation**, describe it in
+   plain words ("Type delhi in the destination field and click Search",
+   "Verify the error 'Invalid password' is shown"), and click **Perform**.
+   With `ANTHROPIC_API_KEY` set, Claude does it one action at a time,
+   looking at the page after each. Without one, the built-in rules read
+   the sentence.
+5. Click a step for **Execute till here** (runs steps 1 to that one) and
+   **+ Add step(s)** (new steps go after it). Drag steps to reorder them.
+   **Run all** replays the whole test.
+6. **Save as module** downloads the steps as JSON. **Import a module** runs
+   a saved recording (a sign-in, say) and adds its steps where you are.
+7. **Save recording** writes the test as Playwright, Selenium or Appium code,
+   with the same templates and readable locators as converted tests, and can
+   run it once to check it passes.
+
+Locators are built when you click, so they find exactly the element you
+clicked: role and name, label or test id for Playwright; id, CSS or XPath for
+Selenium. Links that open a new tab load in the recorded tab.
+
 From the command line:
 
 ```bash
@@ -122,6 +158,8 @@ Things that work differently on the hosted copy:
   own machine. The built-in demo app still works.
 - **One conversion at a time.** Others wait their turn, which keeps a small
   instance within its memory.
+- **Two recordings at a time** (`REC_MAX_SESSIONS` changes it). Each holds a
+  browser tab, and a recording left alone for 20 minutes is closed.
 - **Free-plan memory.** The free plan has 512 MB of memory, which can be too
   little for a large app with both options on. Use `starter` if you see
   restarts.
@@ -141,4 +179,7 @@ npm run demo-app  # the demo app on http://127.0.0.1:5199
 `dom.js`, which runs in the browser), `src/locators.js` matches step words to
 elements, and `src/emit/` holds one writer per framework. `src/agent.js` ties
 these together, `src/verify.js` runs the generated projects, and
-`src/server.js` + `src/ui.js` serve the web page.
+`src/server.js` + `src/ui.js` serve the web page. `src/record/` is the
+recorder: `session.js` (the streamed browser and the steps), `steps.js` (step
+text and export), `ai.js` (AI interactions), `routes.js`, and the page
+(`page.html`, `client.js`).

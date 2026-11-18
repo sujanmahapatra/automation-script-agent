@@ -91,7 +91,7 @@ export async function startDemoApp(port = 0) {
   return { url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = await startDemoApp(Number(process.argv[2] || 5199));
   console.log(`Demo app on ${app.url}`);
 }
